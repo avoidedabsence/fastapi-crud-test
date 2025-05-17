@@ -17,7 +17,8 @@ from database.orm import (
 
 from database.models import (
     OrganizationIn, BuildingIn, ActivityIn,
-    OrganizationUpdate, BuildingUpdate
+    OrganizationUpdate, BuildingUpdate,
+    OrganizationDelete, BuildingDelete
 )
 
 class Database:
@@ -317,48 +318,25 @@ class Database:
                 raise e
         
     @classmethod
-    async def delete_organization(cls, q_type: str, param: str | int):
+    async def delete_organization(cls, org_mod: OrganizationDelete):
         async with cls._sessionmaker() as session:
-            match q_type:
-                case "id":
-                    try:
-                        await session.delete(await session.get(OrgORM, param))
-                        await session.commit()
-                        return True
-                    except Exception as e:
-                        return False
-                case "name":
-                    try:
-                        obj = (await session.execute(select(OrgORM).where(OrgORM.title == param))).scalar_one_or_none()
-                        if obj is None:
-                            return False
-                        await session.delete(obj)
-                        await session.commit()
-                        return True
-                    except Exception as e:
-                        return False
+            try:
+                await session.delete(await session.get(OrgORM, org_mod.id))
+                await session.commit()
+                return True
+            except Exception as e:
+                return False
+
                     
     @classmethod
-    async def delete_building(cls, q_type: str, param: str | int):
+    async def delete_building(cls, build_mod: BuildingDelete):
         async with cls._sessionmaker() as session:
-            match q_type:
-                case "id":
-                    try:
-                        await session.delete(await session.get(BuildORM, param))
-                        await session.commit()
-                        return True
-                    except Exception as e:
-                        return False
-                case "addr":
-                    try:
-                        obj = (await session.execute(select(BuildORM).where(BuildORM.addr == param))).scalar_one_or_none()
-                        if obj is None:
-                            return False
-                        await session.delete(obj)
-                        await session.commit()
-                        return True
-                    except Exception as e:
-                        return False
+            try:
+                await session.delete(await session.get(BuildORM, build_mod.id))
+                await session.commit()
+                return True
+            except Exception as e:
+                return False
     
     @classmethod
     async def update_organization(cls, org_mod: OrganizationUpdate):
