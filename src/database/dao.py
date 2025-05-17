@@ -1,13 +1,23 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.future import select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy import func, cast, text
+from sqlalchemy import func, cast, text, update, case
+from sqlalchemy_utils import Ltree, LtreeType
 from geoalchemy2 import Geography
 from loguru import logger
 from typing import List
 
+from utils.transliteration import translit_table
+
 from database.orm import (
-    Base, OrgORM, ActORM, BuildORM
+    Base, OrgORM, ActORM, BuildORM, Relationship_AO
+)
+
+from database.models import (
+    OrganizationIn, BuildingIn, ActivityIn,
+    OrganizationUpdate, BuildingUpdate
 )
 
 class Database:
@@ -124,7 +134,6 @@ class Database:
 
     @classmethod
     async def organizations_within_radius(cls, lat: float, lon: float, radius: float) -> List[OrgORM] | None:
-        print(lat, lon, radius)
         async with cls._sessionmaker() as session:
             stmt = (
                 select(OrgORM)
@@ -180,3 +189,243 @@ class Database:
             result = await session.execute(stmt)
             
             return result.scalars().all() if result else None
+        
+    @classmethod
+    async def create_organization(cls, org_model: OrganizationIn) -> OrgORM:
+        async with cls._sessionmaker() as session:
+            try:
+                org_obj = OrgORM(
+                    title=org_model.title,
+                    phone=org_model.phone,
+                    b_id=org_model.building_id
+                )
+                
+                session.add(org_obj)
+                await session.commit()
+                await session.refresh(org_obj)
+                
+                org_id = org_obj.id
+                
+                rels = []
+                
+                for act_id in org_model.activity_ids:
+                    rels.append(
+                        Relationship_AO(
+                            org_id=org_id,
+                            act_id=act_id
+                        )
+                    )
+                
+                session.add_all(rels)
+                
+                await session.commit()
+                await session.refresh(org_obj, attribute_names=["building", "activities"])
+                
+                return org_obj
+            except Exception as e:
+                await session.rollback()
+                print(e, e.args, e.__traceback__)
+                raise e
+            
+    @classmethod
+    async def create_building(cls, b_model: BuildingIn) -> BuildORM:
+        async with cls._sessionmaker() as session:
+            try:
+                build_obj = BuildORM(
+                    addr=b_model.addr,
+                    lat=b_model.lat,
+                    lon=b_model.lon
+                )
+                
+                session.add(build_obj)
+                await session.commit()
+                await session.refresh(build_obj)
+                
+                build_id = build_obj.id
+                
+                rels = []
+                
+                stmt = (
+                    update(OrgORM)
+                    .where(OrgORM.title.in_(b_model.organizations))
+                    .values(
+                        b_id=build_id
+                    )
+                )
+                
+                await session.execute(stmt)
+                await session.commit()
+                await session.refresh(build_obj, attribute_names=["orgs"])
+                
+                return build_obj
+            except Exception as e:
+                await session.rollback()
+                raise e
+    
+    @classmethod
+    async def create_activity(cls, act_mod: ActivityIn) -> ActORM:
+        async with cls._sessionmaker() as session:
+            try:
+                parent = None
+
+                for raw_label in act_mod.labels:
+                    vertice = raw_label.translate(translit_table)
+                     
+                    if parent is None:
+                        stmt = (
+                            select(ActORM)
+                            .where(
+                                ActORM.label == raw_label,
+                                func.nlevel(ActORM.path) == 1
+                            )
+                        )
+                    else:
+                        stmt = (
+                            select(ActORM)
+                            .where(
+                                ActORM.label == raw_label,
+                                ActORM.path.descendant_of(parent.path),
+                            )
+                        )
+
+                    result = await session.execute(stmt)
+                    
+                    try:
+                        if parent is not None:
+                            node = result.scalars().all()
+                            node = list(filter(lambda x: len(parent.path) + 1 == len(x.path), result))
+                            print(node)
+                            if not node:
+                                raise NoResultFound
+                        else:
+                            node = result.scalars().one()
+                    except NoResultFound:
+                        node = ActORM(label=raw_label)
+                        if parent is None:
+                            node.path = Ltree(vertice)
+                        else:
+                            node.path = Ltree(f"{parent.path}.{vertice}")
+                        session.add(node)
+                        await session.flush()
+                    print(node.path, " NODE")
+                    parent = node
+                await session.commit()
+                return parent
+            except Exception as e:
+                await session.rollback()
+                print(e, e.__traceback__)
+                raise e
+        
+    @classmethod
+    async def delete_organization(cls, q_type: str, param: str | int):
+        async with cls._sessionmaker() as session:
+            match q_type:
+                case "id":
+                    try:
+                        await session.delete(await session.get(OrgORM, param))
+                        await session.commit()
+                        return True
+                    except Exception as e:
+                        return False
+                case "name":
+                    try:
+                        obj = (await session.execute(select(OrgORM).where(OrgORM.title == param))).scalar_one_or_none()
+                        if obj is None:
+                            return False
+                        await session.delete(obj)
+                        await session.commit()
+                        return True
+                    except Exception as e:
+                        return False
+                    
+    @classmethod
+    async def delete_building(cls, q_type: str, param: str | int):
+        async with cls._sessionmaker() as session:
+            match q_type:
+                case "id":
+                    try:
+                        await session.delete(await session.get(BuildORM, param))
+                        await session.commit()
+                        return True
+                    except Exception as e:
+                        return False
+                case "addr":
+                    try:
+                        obj = (await session.execute(select(BuildORM).where(BuildORM.addr == param))).scalar_one_or_none()
+                        if obj is None:
+                            return False
+                        await session.delete(obj)
+                        await session.commit()
+                        return True
+                    except Exception as e:
+                        return False
+    
+    @classmethod
+    async def update_organization(cls, org_mod: OrganizationUpdate):
+        async with cls._sessionmaker() as session:
+            org_obj = (await session.execute(
+                select(OrgORM)
+                .where(OrgORM.id == org_mod.id)
+                .options(
+                    selectinload(OrgORM.activities)
+                )
+            )).scalar_one_or_none()
+            
+            if org_obj is None:
+                raise IndexError("id is invalid")
+            
+            for k, v in org_mod.dict().items():
+                if k in ("activity_ids", "id") or v is None: continue
+                setattr(org_obj, k, v)
+            
+            if org_mod.activity_ids:
+                old_ids, new_ids = (set([act_obj.id for act_obj in org_obj.activities]),
+                                    set(org_mod.activity_ids))
+                
+                to_del, to_add = list(old_ids - new_ids), list(new_ids - old_ids)
+                
+                to_del_obj = (await session.execute(
+                    select(Relationship_AO)
+                    .where(
+                        Relationship_AO.org_id == org_obj.id,
+                        Relationship_AO.act_id.in_(to_del)
+                    )
+                )).scalars().all()
+                
+                to_add_obj = []
+                
+                for act_id in to_add:
+                    to_add_obj.append(
+                        Relationship_AO(
+                            org_id=org_obj.id,
+                            act_id=act_id
+                        )
+                    )
+                
+                
+                for obj in to_del_obj:
+                    await session.delete(obj)
+                await session.flush()
+                
+                session.add_all(to_add_obj)
+                
+            await session.commit()
+            await session.refresh(org_obj, attribute_names=["building", "activities"])
+            
+            return org_obj
+        
+    @classmethod
+    async def update_building(cls, build_mod: BuildingUpdate):
+        async with cls._sessionmaker() as session:
+            build_obj = await session.get(BuildORM, build_mod.id)
+            if not build_obj:
+                raise IndexError("id is invalid")
+            
+            for k, v in build_mod.dict().items():
+                if k == "id" or v is None: continue
+                setattr(build_obj, k, v)
+            
+            await session.commit()
+            await session.refresh(build_obj, attribute_names=["orgs"])
+            
+            return build_obj

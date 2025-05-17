@@ -6,7 +6,8 @@ import asyncio
 
 from config import Config
 from database.dao import Database
-from api import router
+from api.api_cu import router as CreateUpdateRouter
+from api.api_rd import router as ReadDeleteRouter
 from test_data import create_test_data
 
 @asynccontextmanager
@@ -20,13 +21,14 @@ async def lifespan(app: FastAPI) -> None:
 
 app = FastAPI(
     lifespan=lifespan,
-    title="nebus testing task",
+    title="тестовое fastapi CRUD",
     description=(
         "t.me/avoidedabsence"
     )
 )
 
-app.include_router(router)
+app.include_router(ReadDeleteRouter)
+app.include_router(CreateUpdateRouter)
 
 @app.get("/")
 async def root():

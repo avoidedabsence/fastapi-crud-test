@@ -24,9 +24,6 @@ class Relationship_AO(Base):
 
 class ActORM(Base):
     __tablename__ = "activities"
-    __table_args__ = (
-        CheckConstraint("nlevel(path) <= 3", name="ck_activity_path_nlevel"),
-    )
 
     id: Mapped[int] = mapped_column(Sequence("activities_id_seq"), primary_key=True)
     label: Mapped[str] = mapped_column(nullable=False)

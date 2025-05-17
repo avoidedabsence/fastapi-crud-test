@@ -7,11 +7,13 @@ from typing import List
 import jwt
 
 from database.dao import Database
-from database.models import ActivityOut, OrganizationOut, BuildingOut
+from database.models import (
+    ActivityOut, OrganizationOut, BuildingOut,
+    OrganizationDelete, BuildingDelete
+)
 from config import Config
 
 router = APIRouter()
-
 
 # auth placeholder -------
 API_KEY_NAME = "X-API-KEY"
@@ -30,9 +32,13 @@ def check_key(api_key: str = Security(api_key_header)):
     return api_key
 # auth placeholder -------
 
+"""
+GET REQUESTS
+"""
 
 @router.get(
     "/api/token",
+    tags=["Аутентификация"],
     summary="Получить токен"
 )
 async def get_token(
@@ -48,11 +54,37 @@ async def get_token(
     )
     return {"api_key": token}
 
+
 @router.get(
-    '/api/organization/',
+    '/api/organization/byId/',
+    summary="Получить организацию по ID",
+    response_model=OrganizationOut,
+    status_code=200,
+    tags=["GET Запросы"],
+    dependencies=[Depends(check_key)]
+)
+async def organization_by_self_id(
+    req: Request,
+    org_id: int = Query(..., description="ID организации")
+) -> JSONResponse:
+    model = await Database.get_organization_by_id(org_id)
+    if model: 
+        model = OrganizationOut.model_validate(model).model_dump(exclude_none=True)
+        return model
+    
+    return JSONResponse(
+        {
+            'status': 'failed',
+            'message': 'Not Found'
+        }, status_code=404
+    )
+    
+@router.get(
+    '/api/organizations/byTitle/',
     summary="Поиск организаций по названию",
     response_model=List[OrganizationOut],
     status_code=200,
+    tags=["GET Запросы"],
     dependencies=[Depends(check_key)]
 )
 async def search_for_organizations_h(
@@ -70,41 +102,16 @@ async def search_for_organizations_h(
         {
             'status': 'failed',
             'message': 'Not Found'
-        },
-        404
+        }, status_code=404
     )
 
 
 @router.get(
-    '/api/organization/id/',
-    summary="Получить организацию по ID",
-    response_model=OrganizationOut,
-    status_code=200,
-    dependencies=[Depends(check_key)]
-)
-async def organization_by_self_id(
-    req: Request,
-    org_id: int = Query(..., description="ID организации")
-) -> JSONResponse:
-    model = await Database.get_organization_by_id(org_id)
-    if model: 
-        model = OrganizationOut.model_validate(model).model_dump(exclude_none=True)
-        return model
-    
-    return JSONResponse(
-        {
-            'status': 'failed',
-            'message': 'Not Found'
-        },
-        404
-    )
-
-
-@router.get(
-    '/api/organization/buildingId/',
+    '/api/organizations/byBuildingId/',
     summary="Получить организации в здании",
     response_model=List[OrganizationOut],
     status_code=200,
+    tags=["GET Запросы"],
     dependencies=[Depends(check_key)]
 )
 async def organizations_by_building_id(
@@ -126,10 +133,11 @@ async def organizations_by_building_id(
     )
 
 @router.get(
-    '/api/organization/activity/',
+    '/api/organizations/byActivity/',
     summary="Получить организации по деятельности",
     response_model=List[OrganizationOut],
     status_code=200,
+    tags=["GET Запросы"],
     dependencies=[Depends(check_key)]
 )
 async def organizations_by_activity_label(
@@ -160,10 +168,11 @@ async def organizations_by_activity_label(
 
     
 @router.get(
-    '/api/organization/inRadius/',
+    '/api/organizations/inRadius/',
     summary="Получить организации в радиусе",
     response_model=List[OrganizationOut],
     status_code=200,
+    tags=["GET Запросы"],
     dependencies=[Depends(check_key)]
 )
 async def organizations_in_radius_m(
@@ -191,6 +200,7 @@ async def organizations_in_radius_m(
     summary="Получить здания в радиусе",
     response_model=List[BuildingOut],
     status_code=200,
+    tags=["GET Запросы"],
     dependencies=[Depends(check_key)]
 )
 async def buildings_in_radius_m(
@@ -212,3 +222,44 @@ async def buildings_in_radius_m(
             'message': 'Not Found'
         }, status_code=404
     )
+
+"""
+DELETE REQUESTS
+"""
+
+@router.delete(
+    '/api/organization/delete',
+    summary="Удалить организацию",
+    tags=["DELETE Запросы"],
+    dependencies=[Depends(check_key)]
+)
+async def delete_organization_h(
+    req: Request,
+    org_mod: OrganizationDelete
+) -> JSONResponse:
+    
+    result = await Database.delete_organization(org_mod)
+    
+    if result:
+        return JSONResponse({"status": "ok"})
+    
+    return JSONResponse({"status": "not found"}, status_code=404)
+
+
+@router.delete(
+    '/api/building/delete',
+    summary="Удалить здание",
+    tags=["DELETE Запросы"],
+    dependencies=[Depends(check_key)]
+)
+async def delete_building_h(
+    req: Request,
+    build_mod: BuildingDelete
+) -> JSONResponse:
+    
+    result = await Database.delete_building(build_mod)
+    
+    if result:
+        return JSONResponse({"status": "ok"})
+    
+    return JSONResponse({"status": "not found"}, status_code=404)

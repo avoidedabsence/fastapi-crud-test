@@ -4,6 +4,7 @@ from database.dao import Database
 from database.orm import Base, BuildORM, OrgORM, ActORM, Relationship_AO
 from sqlalchemy_utils import Ltree
 from config import Config
+from utils.transliteration import translit_table
 
 async def create_test_data():
     async with Database._engine.begin() as conn:
@@ -26,12 +27,12 @@ async def create_test_data():
         await session.flush()
         
         activities = [
-            ActORM(label="Образование", path=Ltree("1")),
-            ActORM(label="Среднее образование", path=Ltree("1.1")),
-            ActORM(label="Высшее образование", path=Ltree("1.2")),
-            ActORM(label="Медицина", path=Ltree("2")),
-            ActORM(label="Поликлиника", path=Ltree("2.1")),
-            ActORM(label="Больница", path=Ltree("2.2")),
+            ActORM(label="Образование", path=Ltree("Образование".translate(translit_table))),
+            ActORM(label="Среднее образование", path=Ltree("Образование.Среднее_образование".translate(translit_table))),
+            ActORM(label="Высшее образование", path=Ltree("Образование.Высшее_образование".translate(translit_table))),
+            ActORM(label="Медицина", path=Ltree("Медицина".translate(translit_table))),
+            ActORM(label="Поликлиника", path=Ltree("Медицина.Поликлиника".translate(translit_table))),
+            ActORM(label="Больница", path=Ltree("Медицина.Больница".translate(translit_table))),
         ]
         session.add_all(activities)
         await session.flush()
