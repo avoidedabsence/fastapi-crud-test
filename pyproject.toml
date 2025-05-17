@@ -1,5 +1,5 @@
 [project]
-name = "nebus-test"
+name = "crud-test"
 version = "0.1.0"
 description = ""
 authors = [
@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [tool.poetry]
-name = "nebus-test"
+name = "crud-test"
 version = "0.1.0"
 description = ""
 authors = [
