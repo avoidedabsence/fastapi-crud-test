@@ -18,7 +18,7 @@ from database.models import (
     OrganizationIn,
     OrganizationUpdate,
 )
-from database.orm import ActORM, BuildORM, OrgORM, Relationship_AO
+from database.orm import ActORM, BuildORM, OrgORM, RelationshipAO
 from utils.transliteration import translit_table
 
 
@@ -30,9 +30,9 @@ class Database:
     async def init(cls, db_url: str, max_conn: int):
         cls._engine = create_async_engine(db_url, echo=False, pool_size=max_conn)
         cls._sessionmaker = async_sessionmaker(cls._engine, expire_on_commit=False)
-        async with cls._engine.begin() as conn:
-            """await conn.execute(text(
-                "CREATE EXTENSION IF NOT EXISTS ltree;"  Генерируется в generate_test_data, при проде нужно вернуть
+        """async with cls._engine.begin() as conn:
+            await conn.execute(text(
+                "CREATE EXTENSION IF NOT EXISTS ltree;"
             ))
             await conn.run_sync(Base.metadata.create_all)"""
         logger.info(
@@ -222,7 +222,7 @@ class Database:
                 rels = []
 
                 for act_id in org_model.activity_ids:
-                    rels.append(Relationship_AO(org_id=org_id, act_id=act_id))
+                    rels.append(RelationshipAO(org_id=org_id, act_id=act_id))
 
                 session.add_all(rels)
 
@@ -254,9 +254,11 @@ class Database:
 
                 build_id = build_obj.id
 
-                rels = []
-
-                stmt = update(OrgORM).where(OrgORM.title.in_(b_model.organizations)).values(b_id=build_id)
+                stmt = (
+                    update(OrgORM)
+                    .where(OrgORM.title.in_(b_model.organizations))
+                    .values(b_id=build_id)
+                )
 
                 await session.execute(stmt)
                 await session.commit()
@@ -345,7 +347,9 @@ class Database:
         async with cls._sessionmaker() as session:
             org_obj = (
                 await session.execute(
-                    select(OrgORM).where(OrgORM.id == org_mod.id).options(selectinload(OrgORM.activities)),
+                    select(OrgORM)
+                    .where(OrgORM.id == org_mod.id)
+                    .options(selectinload(OrgORM.activities)),
                 )
             ).scalar_one_or_none()
 
@@ -359,8 +363,8 @@ class Database:
 
             if org_mod.activity_ids:
                 old_ids, new_ids = (
-                    set([act_obj.id for act_obj in org_obj.activities]),
-                    set(org_mod.activity_ids),
+                    {act_obj.id for act_obj in org_obj.activities},
+                    {org_mod.activity_ids},
                 )
 
                 to_del, to_add = list(old_ids - new_ids), list(new_ids - old_ids)
@@ -368,9 +372,9 @@ class Database:
                 to_del_obj = (
                     (
                         await session.execute(
-                            select(Relationship_AO).where(
-                                Relationship_AO.org_id == org_obj.id,
-                                Relationship_AO.act_id.in_(to_del),
+                            select(RelationshipAO).where(
+                                RelationshipAO.org_id == org_obj.id,
+                                RelationshipAO.act_id.in_(to_del),
                             ),
                         )
                     )
@@ -381,7 +385,7 @@ class Database:
                 to_add_obj = []
 
                 for act_id in to_add:
-                    to_add_obj.append(Relationship_AO(org_id=org_obj.id, act_id=act_id))
+                    to_add_obj.append(RelationshipAO(org_id=org_obj.id, act_id=act_id))
 
                 for obj in to_del_obj:
                     await session.delete(obj)

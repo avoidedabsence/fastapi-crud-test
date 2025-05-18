@@ -1,4 +1,4 @@
-line-length=120
+line-length=88
 
 [lint]
 select = [
@@ -10,7 +10,6 @@ select = [
     "N",
     "UP",
     "YTT",
-    "ANN",
     "B",
     "A",
     "COM",
@@ -49,7 +48,7 @@ ignore = [
     "ARG001",
     "D103",
     "N812",
-    "RET504"
+    "RET504","COM812"
 ]
 unfixable = ["F401", "F841"]
 

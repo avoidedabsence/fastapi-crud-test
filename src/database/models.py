@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy_utils import Ltree
 
 # --------------------- OUTPUT
@@ -30,7 +30,8 @@ class ActivityOut(BaseModel):
         description="Список организаций в этом здании (optional)",
     )
 
-    @validator("path", pre=True)
+    @field_validator("path", pre=True)
+    @classmethod
     def validate_path(cls, value):
         if isinstance(value, Ltree):
             return value.path
@@ -59,14 +60,20 @@ class BuildingIn(BaseModel):
     lon: float = Field(description="Долгота здания", examples=[32.3])
     organizations: Optional[List[str]] = Field(
         default=None,
-        description="Список названий <b>существующих</b> организаций, которые находятся в здании (предыдущие офисы компаний будут перезаписаны на новое здание)",
+        description=(
+            "Список названий <b>существующих</b> организаций, которые находятся"
+            "в здании (предыдущие офисы компаний будут перезаписаны на новое здание)"
+        ),
         examples=[["Организация #1", "Организация #2", "etc..."]],
     )
 
 
 class ActivityIn(BaseModel):
     labels: list[str] = Field(
-        description="Полный путь до создаваемой деятельности (все указанные деятельности будут созданы, даже если все предки не существуют)",
+        description=(
+            "Полный путь до создаваемой деятельности (все указанные"
+            " деятельности будут созданы, даже если все предки не существуют)"
+        ),
         examples=[["Компьютеры", "Ноутбуки", "ASUS"]],
     )
 

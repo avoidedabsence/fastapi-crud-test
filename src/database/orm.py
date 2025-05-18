@@ -12,7 +12,7 @@ class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 
-class Relationship_AO(Base):
+class RelationshipAO(Base):
     __tablename__ = "rel_ao"
 
     org_id: Mapped[int] = mapped_column(

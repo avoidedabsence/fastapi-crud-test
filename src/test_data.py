@@ -5,6 +5,9 @@ from database.dao import Database
 from database.orm import ActORM, Base, BuildORM, OrgORM, Relationship_AO
 from utils.transliteration import translit_table
 
+# NOTE: Placeholder for real data, overwrites all previous data stored in docker-mounted
+# volume for Postgres
+
 
 async def create_test_data():
     async with Database._engine.begin() as conn:
@@ -14,7 +17,10 @@ async def create_test_data():
         await conn.run_sync(Base.metadata.create_all)
 
     async with Database._sessionmaker() as session:
-        builds = [BuildORM(addr=f"ул. Пушкина, дом {i}", lat=55.0 + i, lon=37.0 + i) for i in range(1, 6)]
+        builds = [
+            BuildORM(addr=f"ул. Пушкина, дом {i}", lat=55.0 + i, lon=37.0 + i)
+            for i in range(1, 6)
+        ]
         session.add_all(builds)
         await session.flush()
 
