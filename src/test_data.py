@@ -2,7 +2,7 @@ from sqlalchemy import text
 from sqlalchemy_utils import Ltree
 
 from database.dao import Database
-from database.orm import ActORM, Base, BuildORM, OrgORM, Relationship_AO
+from database.orm import ActORM, Base, BuildORM, OrgORM, RelationshipAO
 from utils.transliteration import translit_table
 
 # NOTE: Placeholder for real data, overwrites all previous data stored in docker-mounted
@@ -64,13 +64,13 @@ async def create_test_data():
         rels = []
         for i, org in enumerate(orgs):
             rels.append(
-                Relationship_AO(
+                RelationshipAO(
                     org_id=org.id,
                     act_id=activities[i % len(activities)].id,
                 ),
             )
             rels.append(
-                Relationship_AO(
+                RelationshipAO(
                     org_id=org.id,
                     act_id=activities[(i + 1) % len(activities)].id,
                 ),

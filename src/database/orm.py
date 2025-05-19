@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.schema import CheckConstraint
 from sqlalchemy_utils import Ltree, LtreeType
 
 
@@ -27,6 +28,9 @@ class RelationshipAO(Base):
 
 class ActORM(Base):
     __tablename__ = "activities"
+    __table_args__ = (
+        CheckConstraint("nlevel(path) <= 3", name="ck_activity_path_nlevel"),
+    )
 
     id: Mapped[int] = mapped_column(Sequence("activities_id_seq"), primary_key=True)
     label: Mapped[str] = mapped_column(nullable=False)

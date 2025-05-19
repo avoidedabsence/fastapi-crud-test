@@ -30,7 +30,7 @@ class ActivityOut(BaseModel):
         description="Список организаций в этом здании (optional)",
     )
 
-    @field_validator("path", pre=True)
+    @field_validator("path", mode="before")
     @classmethod
     def validate_path(cls, value):
         if isinstance(value, Ltree):

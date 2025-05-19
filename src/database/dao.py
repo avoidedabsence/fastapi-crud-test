@@ -3,7 +3,7 @@ from typing import List
 from geoalchemy2 import Geography
 from loguru import logger
 from sqlalchemy import cast, func, update
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload, selectinload
@@ -283,29 +283,27 @@ class Database:
                             ActORM.label == raw_label,
                             func.nlevel(ActORM.path) == 1,
                         )
+
+                        result = await session.execute(stmt)
+
+                        node = result.scalars().all()
+                        node = list(
+                            filter(
+                                lambda x: len(parent.path) + 1 == len(x.path),
+                                result,
+                            ),
+                        )
                     else:
                         stmt = select(ActORM).where(
                             ActORM.label == raw_label,
                             ActORM.path.descendant_of(parent.path),
                         )
 
-                    result = await session.execute(stmt)
+                        result = await session.execute(stmt)
 
-                    try:
-                        if parent is not None:
-                            node = result.scalars().all()
-                            node = list(
-                                filter(
-                                    lambda x: len(parent.path) + 1 == len(x.path),
-                                    result,
-                                ),
-                            )
-                            print(node)
-                            if not node:
-                                raise NoResultFound
-                        else:
-                            node = result.scalars().one()
-                    except NoResultFound:
+                        node = result.scalar_one_or_none()
+
+                    if not node:
                         node = ActORM(label=raw_label)
                         if parent is None:
                             node.path = Ltree(vertice)
@@ -313,13 +311,14 @@ class Database:
                             node.path = Ltree(f"{parent.path}.{vertice}")
                         session.add(node)
                         await session.flush()
-                    print(node.path, " NODE")
                     parent = node
                 await session.commit()
                 return parent
             except Exception as e:
                 await session.rollback()
-                print(e, e.__traceback__)
+                logger.exception(
+                    "Catched exc {} in create_activity, probably IntegrityError", e
+                )
                 raise e
 
     @classmethod

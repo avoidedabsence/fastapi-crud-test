@@ -66,11 +66,10 @@ async def create_organization_h(
                 exclude_none=True,
             )
             return result
-
-        return HTTPException(500, "ISE")
-
     except Exception as e:
-        return HTTPException(400, e.__str__)
+        raise HTTPException(400, e.__class__.__name__) from e
+
+    raise HTTPException(500, "ISE")
 
 
 @router.post(
@@ -91,25 +90,22 @@ async def create_building_h(
         if result:
             result = BuildingOut.model_validate(result).model_dump(exclude_none=True)
             return result
-
-        return HTTPException(500, "ISE")
-
     except Exception as e:
-        return HTTPException(400, e.__str__)
+        raise HTTPException(400, e.__class__.__name__) from e
+
+    raise HTTPException(500, "ISE")
 
 
 @router.post(
     "/api/activity/create",
     summary="Создать деятельность",
-    response_model=ActivityOut,
-    status_code=200,
     tags=["POST Запросы"],
     dependencies=[Depends(check_key)],
 )
 async def create_activity_h(
     req: Request,
     act_mod: ActivityIn,
-) -> dict[str, Any] | HTTPException:
+):
     try:
         result = await Database.create_activity(act_mod)
 
@@ -117,11 +113,10 @@ async def create_activity_h(
             result = ActivityOut.model_validate(result).model_dump(exclude_none=True)
             return result
 
-        return HTTPException(500, "ISE")
-
     except Exception as e:
-        print(e, e.args, e.__traceback__)
-        return HTTPException(400, e.__str__)
+        raise HTTPException(400, e.__class__.__name__) from e
+
+    raise HTTPException(500, "ISE")
 
 
 """
@@ -150,10 +145,10 @@ async def update_organization_h(
             )
             return result
 
-        return HTTPException(500, "ISE")
-
     except Exception as e:
-        return HTTPException(400, e)
+        raise HTTPException(400, e.__class__.__name__) from e
+
+    raise HTTPException(500, "ISE")
 
 
 @router.put(
@@ -175,7 +170,7 @@ async def update_building_h(
             result = BuildingOut.model_validate(result).model_dump(exclude_none=True)
             return result
 
-        return HTTPException(500, "ISE")
-
     except Exception as e:
-        return HTTPException(400, e)
+        raise HTTPException(400, e.__class__.__name__) from e
+
+    raise HTTPException(500, "ISE")
