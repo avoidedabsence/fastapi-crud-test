@@ -4,6 +4,7 @@ import jwt
 from fastapi import APIRouter, Depends, Request, Security
 from fastapi.exceptions import HTTPException
 from fastapi.security import APIKeyHeader
+from loguru import logger
 
 from config import Config
 from database.dao import Database

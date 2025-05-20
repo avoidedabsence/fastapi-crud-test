@@ -355,7 +355,7 @@ class Database:
             if org_obj is None:
                 raise IndexError("id is invalid")
 
-            for k, v in org_mod.dict().items():
+            for k, v in org_mod.model_dump().items():
                 if k in ("activity_ids", "id") or v is None:
                     continue
                 setattr(org_obj, k, v)
@@ -363,7 +363,7 @@ class Database:
             if org_mod.activity_ids:
                 old_ids, new_ids = (
                     {act_obj.id for act_obj in org_obj.activities},
-                    {org_mod.activity_ids},
+                    set(org_mod.activity_ids),
                 )
 
                 to_del, to_add = list(old_ids - new_ids), list(new_ids - old_ids)
